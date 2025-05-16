@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 interface LoginFormProps {
   onLogin: (token: string) => void;
@@ -38,10 +38,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+        <div className="flex flex-col items-center">
+          <img src="/favicon.ico" alt="Logo" className="w-12 h-12 mb-2" />
+          <h1 className="text-2xl font-bold text-indigo-700 mb-1">Vapi Assistant Manager</h1>
+          <h2 className="mt-2 text-center text-2xl font-extrabold text-gray-900">
             Sign in to your account
           </h2>
         </div>
@@ -95,6 +97,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             </button>
           </div>
         </form>
+        <div className="flex justify-between items-center mt-4">
+          <span className="text-sm text-gray-500">Don't have an account?</span>
+          <Link
+            to="/register"
+            className="text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+          >
+            Register
+          </Link>
+        </div>
+        <div className="mt-8 text-xs text-gray-400 text-center">&copy; {new Date().getFullYear()} Vapi Assistant Manager. All rights reserved.</div>
       </div>
     </div>
   );
