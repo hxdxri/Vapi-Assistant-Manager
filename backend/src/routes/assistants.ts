@@ -11,9 +11,17 @@ const prisma = new PrismaClient();
 // Get all assistants for the authenticated user
 router.get('/', auth, async (req: AuthRequest, res: Response) => {
   try {
-    const assistants = await prisma.assistant.findMany({
-      where: { userId: req.user!.id },
+    // Fetch all assistants from Vapi
+    const vapiResponse = await axios.get('https://api.vapi.ai/assistants', {
+      headers: {
+        'Authorization': `Bearer ${process.env.VAPI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
     });
+    // Filter by metadata.businessId === req.user.id
+    const assistants = (vapiResponse.data || []).filter((assistant: any) =>
+      assistant.metadata && assistant.metadata.businessId === req.user!.id
+    );
     res.json(assistants);
   } catch (error) {
     console.error(error);

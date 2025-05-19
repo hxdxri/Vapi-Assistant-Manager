@@ -10,7 +10,11 @@ interface Assistant {
   recordingEnabled: boolean;
 }
 
-const AssistantList: React.FC = () => {
+interface AssistantListProps {
+  vapiKey: string;
+}
+
+const AssistantList: React.FC<AssistantListProps> = ({ vapiKey }) => {
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -18,21 +22,15 @@ const AssistantList: React.FC = () => {
   useEffect(() => {
     const fetchAssistants = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
-
-        const response = await fetch('http://localhost:3000/api/assistants', {
+        const response = await fetch('https://api.vapi.ai/assistants', {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${vapiKey}`,
+            'Content-Type': 'application/json',
           },
         });
-
         if (!response.ok) {
-          throw new Error('Failed to fetch assistants');
+          throw new Error('Failed to fetch assistants from Vapi API');
         }
-
         const data = await response.json();
         setAssistants(data);
       } catch (err) {
@@ -41,9 +39,8 @@ const AssistantList: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchAssistants();
-  }, []);
+  }, [vapiKey]);
 
   if (loading) {
     return (
