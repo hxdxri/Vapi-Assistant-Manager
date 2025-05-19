@@ -29,6 +29,7 @@ const App: React.FC = () => {
               <div className="flex justify-between h-16">
                 <div className="flex">
                   <div className="flex-shrink-0 flex items-center">
+                    <img src="/favicon.ico" alt="Logo" className="h-8 w-8 mr-2" />
                     <h1 className="text-xl font-bold text-indigo-600">
                       Vapi Assistant Manager
                     </h1>
