@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     setToken(null);
+    window.location.href = '/login'; // force redirect
   };
 
   return (
@@ -67,6 +68,20 @@ const App: React.FC = () => {
                   <RegisterForm onRegister={handleLogin} />
                 ) : (
                   <Navigate to="/assistants" replace />
+                )
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                token ? (
+                  <div className="bg-white shadow rounded-lg p-8 text-center">
+                    <h2 className="text-2xl font-bold text-indigo-700 mb-2">Welcome to Vapi Assistant Manager</h2>
+                    <p className="text-gray-600 mb-4">Manage your AI assistants for your business. To get started, please enter your Vapi API key.</p>
+                    {/* TODO: Add Vapi API key input and save logic here */}
+                  </div>
+                ) : (
+                  <Navigate to="/login" replace />
                 )
               }
             />
