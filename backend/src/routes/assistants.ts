@@ -1,14 +1,15 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { PrismaClient } from '@prisma/client';
 import { auth } from '../middleware/auth';
 import axios from 'axios';
+import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
 
 // Get all assistants for the authenticated user
-router.get('/', auth, async (req, res) => {
+router.get('/', auth, async (req: AuthRequest, res: Response) => {
   try {
     const assistants = await prisma.assistant.findMany({
       where: { userId: req.user!.id },
@@ -31,7 +32,7 @@ router.post(
     body('languageCode').notEmpty().withMessage('Language code is required'),
     body('introMessage').notEmpty().withMessage('Intro message is required'),
   ],
-  async (req, res) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -110,7 +111,7 @@ router.patch(
     body('transcriptionEnabled').optional().isBoolean(),
     body('recordingEnabled').optional().isBoolean(),
   ],
-  async (req, res) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -170,7 +171,7 @@ router.patch(
 );
 
 // Get a specific assistant
-router.get('/:id', auth, async (req, res) => {
+router.get('/:id', auth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
