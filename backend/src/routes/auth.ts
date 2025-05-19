@@ -107,4 +107,33 @@ router.post(
   }
 );
 
+// Test token endpoint
+router.get('/test-token', async (req: Request, res: Response) => {
+  try {
+    // Generate a test token
+    const testUser = { id: 'test-user-id', email: 'test@example.com' };
+    const token = jwt.sign(testUser, process.env.JWT_SECRET!, { expiresIn: '1h' });
+    
+    // Verify the token immediately to ensure it works
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: string; email: string };
+      
+      res.json({
+        message: 'JWT token generation and verification successful',
+        token,
+        decoded,
+        jwt_secret_length: process.env.JWT_SECRET?.length || 0
+      });
+    } catch (verifyError) {
+      res.status(500).json({
+        error: 'JWT verification failed immediately after generation',
+        details: verifyError
+      });
+    }
+  } catch (error) {
+    console.error('Test token error:', error);
+    res.status(500).json({ error: 'Server error during token test' });
+  }
+});
+
 export default router; 

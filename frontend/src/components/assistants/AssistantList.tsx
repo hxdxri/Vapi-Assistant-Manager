@@ -1,20 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+// Interface for Vapi assistant
 interface Assistant {
   id: string;
   name: string;
-  voiceProvider: string;
-  languageCode: string;
-  transcriptionEnabled: boolean;
-  recordingEnabled: boolean;
+  voice?: {
+    provider: string;
+    voiceId?: string;
+    language?: string;
+  };
+  transcriber?: {
+    provider: string;
+    language: string;
+  };
+  initial_message?: string;
+  firstMessage?: string;
+  metadata?: {
+    businessId?: string;
+    [key: string]: any;
+  };
+  recording_enabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-interface AssistantListProps {
-  vapiKey: string;
-}
-
-const AssistantList: React.FC<AssistantListProps> = ({ vapiKey }) => {
+const AssistantList: React.FC = () => {
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -22,25 +35,34 @@ const AssistantList: React.FC<AssistantListProps> = ({ vapiKey }) => {
   useEffect(() => {
     const fetchAssistants = async () => {
       try {
-        const response = await fetch('https://api.vapi.ai/assistants', {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        const response = await fetch('/api/assistants', {
           headers: {
-            'Authorization': `Bearer ${vapiKey}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         });
+
         if (!response.ok) {
-          throw new Error('Failed to fetch assistants from Vapi API');
+          throw new Error(`Failed to fetch assistants: ${response.status} ${response.statusText}`);
         }
+
         const data = await response.json();
         setAssistants(data);
       } catch (err) {
+        console.error('Error fetching assistants:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
     };
+
     fetchAssistants();
-  }, [vapiKey]);
+  }, []);
 
   if (loading) {
     return (
@@ -52,8 +74,31 @@ const AssistantList: React.FC<AssistantListProps> = ({ vapiKey }) => {
 
   if (error) {
     return (
-      <div className="rounded-md bg-red-50 p-4">
+      <div className="rounded-md bg-red-50 p-4 mb-4">
         <div className="text-sm text-red-700">{error}</div>
+        <div className="mt-2">
+          <button 
+            onClick={() => window.location.reload()}
+            className="text-sm font-medium text-red-600 hover:text-red-800"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (assistants.length === 0) {
+    return (
+      <div className="bg-white shadow overflow-hidden sm:rounded-md p-6 text-center">
+        <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Your Assistants</h3>
+        <p className="text-gray-500 mb-4">You don't have any assistants yet.</p>
+        <Link
+          to="/assistants/new"
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+        >
+          Create Your First Assistant
+        </Link>
       </div>
     );
   }
@@ -85,22 +130,22 @@ const AssistantList: React.FC<AssistantListProps> = ({ vapiKey }) => {
                   </div>
                   <div className="ml-2 flex-shrink-0 flex">
                     <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                      {assistant.voiceProvider}
+                      {assistant.voice?.provider || 'No voice provider'}
                     </p>
                   </div>
                 </div>
                 <div className="mt-2 sm:flex sm:justify-between">
                   <div className="sm:flex">
                     <p className="flex items-center text-sm text-gray-500">
-                      Language: {assistant.languageCode}
+                      Language: {assistant.voice?.language || 'N/A'}
                     </p>
                   </div>
                   <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
                     <p className="mr-4">
-                      Transcription: {assistant.transcriptionEnabled ? 'Enabled' : 'Disabled'}
+                      Created: {new Date(assistant.createdAt || assistant.created_at || '').toLocaleDateString()}
                     </p>
                     <p>
-                      Recording: {assistant.recordingEnabled ? 'Enabled' : 'Disabled'}
+                      Last Updated: {new Date(assistant.updatedAt || assistant.updated_at || '').toLocaleDateString()}
                     </p>
                   </div>
                 </div>

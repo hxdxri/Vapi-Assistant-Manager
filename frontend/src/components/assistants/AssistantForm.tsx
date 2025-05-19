@@ -3,18 +3,24 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 interface AssistantFormData {
   name: string;
-  availabilityJson: {
+  availability?: {
     [key: string]: {
       start: string;
       end: string;
     }[];
   };
-  voiceProvider: string;
-  languageCode: string;
-  introMessage: string;
-  webhookUrl: string;
-  transcriptionEnabled: boolean;
-  recordingEnabled: boolean;
+  voice?: {
+    provider: string;
+    language: string;
+  };
+  firstMessage?: string;
+  webhookUrl?: string;
+  transcriptionEnabled?: boolean;
+  recordingEnabled?: boolean;
+  metadata?: {
+    businessId?: string;
+    [key: string]: any;
+  };
 }
 
 const defaultAvailability = {
@@ -32,12 +38,15 @@ const AssistantForm: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [formData, setFormData] = useState<AssistantFormData>({
     name: '',
-    availabilityJson: defaultAvailability,
-    voiceProvider: 'elevenlabs',
-    languageCode: 'en-US',
-    introMessage: '',
+    availability: defaultAvailability,
+    voice: {
+      provider: 'elevenlabs',
+      language: 'en-US',
+    },
+    firstMessage: '',
     webhookUrl: '',
     transcriptionEnabled: true,
     recordingEnabled: true,
@@ -51,25 +60,40 @@ const AssistantForm: React.FC = () => {
 
   const fetchAssistant = async () => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://localhost:3000/api/assistants/${id}`, {
+      const response = await fetch(`/api/assistants/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch assistant');
+        throw new Error(`Failed to fetch assistant: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
-      setFormData(data);
+      const assistant = await response.json();
+      
+      // Convert Vapi assistant to form data format
+      setFormData({
+        name: assistant.name || '',
+        availability: assistant.availability || defaultAvailability,
+        voice: assistant.voice || { provider: 'elevenlabs', language: 'en-US' },
+        firstMessage: assistant.initial_message || assistant.firstMessage || '',
+        webhookUrl: assistant.webhook?.url || '',
+        transcriptionEnabled: assistant.transcriber?.enabled !== false,
+        recordingEnabled: assistant.recording_enabled !== false,
+      });
     } catch (err) {
+      console.error('Error fetching assistant:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -77,6 +101,7 @@ const AssistantForm: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
       const token = localStorage.getItem('token');
@@ -84,9 +109,20 @@ const AssistantForm: React.FC = () => {
         throw new Error('No authentication token found');
       }
 
-      const url = id
-        ? `http://localhost:3000/api/assistants/${id}`
-        : 'http://localhost:3000/api/assistants';
+      // Format data for Vapi API
+      const apiData = {
+        name: formData.name,
+        availability: formData.availability,
+        voice: formData.voice,
+        initial_message: formData.firstMessage,
+        webhook: formData.webhookUrl ? { url: formData.webhookUrl } : undefined,
+        transcriber: {
+          enabled: formData.transcriptionEnabled
+        },
+        recording_enabled: formData.recordingEnabled,
+      };
+
+      const url = id ? `/api/assistants/${id}` : '/api/assistants';
       const method = id ? 'PATCH' : 'POST';
 
       const response = await fetch(url, {
@@ -95,15 +131,20 @@ const AssistantForm: React.FC = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(apiData),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save assistant');
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to save assistant: ${response.status}`);
       }
 
-      navigate('/assistants');
+      setSuccess('Assistant saved successfully!');
+      setTimeout(() => {
+        navigate('/assistants');
+      }, 1500);
     } catch (err) {
+      console.error('Error saving assistant:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -118,9 +159,9 @@ const AssistantForm: React.FC = () => {
   ) => {
     setFormData((prev) => ({
       ...prev,
-      availabilityJson: {
-        ...prev.availabilityJson,
-        [day]: prev.availabilityJson[day].map((slot, i) =>
+      availability: {
+        ...(prev.availability || defaultAvailability),
+        [day]: (prev.availability?.[day] || []).map((slot, i) =>
           i === index ? { ...slot, [field]: value } : slot
         ),
       },
@@ -130,9 +171,9 @@ const AssistantForm: React.FC = () => {
   const addTimeSlot = (day: string) => {
     setFormData((prev) => ({
       ...prev,
-      availabilityJson: {
-        ...prev.availabilityJson,
-        [day]: [...prev.availabilityJson[day], { start: '09:00', end: '17:00' }],
+      availability: {
+        ...(prev.availability || defaultAvailability),
+        [day]: [...(prev.availability?.[day] || []), { start: '09:00', end: '17:00' }],
       },
     }));
   };
@@ -140,15 +181,15 @@ const AssistantForm: React.FC = () => {
   const removeTimeSlot = (day: string, index: number) => {
     setFormData((prev) => ({
       ...prev,
-      availabilityJson: {
-        ...prev.availabilityJson,
-        [day]: prev.availabilityJson[day].filter((_, i) => i !== index),
+      availability: {
+        ...(prev.availability || defaultAvailability),
+        [day]: (prev.availability?.[day] || []).filter((_, i) => i !== index),
       },
     }));
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 divide-y divide-gray-200">
+    <form onSubmit={handleSubmit} className="space-y-8 divide-y divide-gray-200 bg-white shadow sm:rounded-md px-6 py-8">
       <div className="space-y-8 divide-y divide-gray-200">
         <div>
           <div>
@@ -163,6 +204,12 @@ const AssistantForm: React.FC = () => {
           {error && (
             <div className="mt-4 rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-700">{error}</div>
+            </div>
+          )}
+
+          {success && (
+            <div className="mt-4 rounded-md bg-green-50 p-4">
+              <div className="text-sm text-green-700">{success}</div>
             </div>
           )}
 
@@ -191,23 +238,23 @@ const AssistantForm: React.FC = () => {
 
             <div className="sm:col-span-6">
               <label
-                htmlFor="introMessage"
+                htmlFor="firstMessage"
                 className="block text-sm font-medium text-gray-700"
               >
-                Introduction Message
+                First Message
               </label>
               <div className="mt-1">
                 <textarea
-                  id="introMessage"
-                  name="introMessage"
+                  id="firstMessage"
+                  name="firstMessage"
                   rows={3}
                   required
                   className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={formData.introMessage}
+                  value={formData.firstMessage}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      introMessage: e.target.value,
+                      firstMessage: e.target.value,
                     }))
                   }
                 />
@@ -227,43 +274,46 @@ const AssistantForm: React.FC = () => {
                   name="voiceProvider"
                   required
                   className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={formData.voiceProvider}
+                  value={formData.voice?.provider}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      voiceProvider: e.target.value,
+                      voice: { ...prev.voice, provider: e.target.value },
                     }))
                   }
                 >
                   <option value="elevenlabs">ElevenLabs</option>
                   <option value="azure">Azure</option>
                   <option value="google">Google</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="playht">PlayHT</option>
                 </select>
               </div>
             </div>
 
             <div className="sm:col-span-3">
               <label
-                htmlFor="languageCode"
+                htmlFor="language"
                 className="block text-sm font-medium text-gray-700"
               >
                 Language
               </label>
               <div className="mt-1">
                 <select
-                  id="languageCode"
-                  name="languageCode"
+                  id="language"
+                  name="language"
                   required
                   className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={formData.languageCode}
+                  value={formData.voice?.language}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      languageCode: e.target.value,
+                      voice: { ...prev.voice, language: e.target.value },
                     }))
                   }
                 >
                   <option value="en-US">English (US)</option>
+                  <option value="en-GB">English (UK)</option>
                   <option value="es-ES">Spanish</option>
                   <option value="fr-FR">French</option>
                   <option value="de-DE">German</option>
@@ -370,7 +420,7 @@ const AssistantForm: React.FC = () => {
           </div>
 
           <div className="mt-6 space-y-6">
-            {Object.entries(formData.availabilityJson).map(([day, slots]) => (
+            {Object.entries(formData.availability || defaultAvailability).map(([day, slots]) => (
               <div key={day} className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-medium text-gray-900 capitalize">

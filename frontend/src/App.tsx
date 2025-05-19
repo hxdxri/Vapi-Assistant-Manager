@@ -9,7 +9,6 @@ const App: React.FC = () => {
   const [token, setToken] = React.useState<string | null>(
     localStorage.getItem('token')
   );
-  const [vapiKey, setVapiKey] = React.useState<string | null>(localStorage.getItem('vapiKey'));
 
   const handleLogin = (newToken: string) => {
     localStorage.setItem('token', newToken);
@@ -20,11 +19,6 @@ const App: React.FC = () => {
     localStorage.removeItem('token');
     setToken(null);
     window.location.href = '/login'; // force redirect
-  };
-
-  const handleSetVapiKey = (key: string) => {
-    localStorage.setItem('vapiKey', key);
-    setVapiKey(key);
   };
 
   return (
@@ -81,15 +75,13 @@ const App: React.FC = () => {
               path="/dashboard"
               element={
                 token ? (
-                  !vapiKey ? (
-                    <div className="bg-white shadow rounded-lg p-8 text-center max-w-lg mx-auto mt-12">
+                  <div className="space-y-6">
+                    <div className="bg-white shadow rounded-lg p-8">
                       <h2 className="text-2xl font-bold text-indigo-700 mb-2">Welcome to Vapi Assistant Manager</h2>
-                      <p className="text-gray-600 mb-4">Enter your Vapi API key to manage your AI assistants.</p>
-                      <input type="password" className="border border-gray-300 rounded-md px-4 py-2 w-full mb-4 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Vapi API Key" onChange={e => handleSetVapiKey(e.target.value)} />
+                      <p className="text-gray-600 mb-4">Manage your AI voice assistants for your business. Use the controls below to create, edit, and customize your assistants.</p>
                     </div>
-                  ) : (
-                    <AssistantList vapiKey={vapiKey} />
-                  )
+                    <AssistantList />
+                  </div>
                 ) : (
                   <Navigate to="/login" replace />
                 )
@@ -98,8 +90,8 @@ const App: React.FC = () => {
             <Route
               path="/assistants"
               element={
-                token && vapiKey ? (
-                  <AssistantList vapiKey={vapiKey} />
+                token ? (
+                  <AssistantList />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )

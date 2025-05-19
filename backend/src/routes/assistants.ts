@@ -11,18 +11,16 @@ const prisma = new PrismaClient();
 // Get all assistants for the authenticated user
 router.get('/', auth, async (req: AuthRequest, res: Response) => {
   try {
-    // Fetch all assistants from Vapi
-    const vapiResponse = await axios.get('https://api.vapi.ai/assistants', {
+    // Fetch all assistants from Vapi without filtering
+    const vapiResponse = await axios.get('https://api.vapi.ai/assistant', {
       headers: {
         'Authorization': `Bearer ${process.env.VAPI_API_KEY}`,
         'Content-Type': 'application/json',
       },
     });
-    // Filter by metadata.businessId === req.user.id
-    const assistants = (vapiResponse.data || []).filter((assistant: any) =>
-      assistant.metadata && assistant.metadata.businessId === req.user!.id
-    );
-    res.json(assistants);
+    
+    // Return all assistants without filtering
+    res.json(vapiResponse.data || []);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
@@ -35,10 +33,10 @@ router.post(
   auth,
   [
     body('name').notEmpty().withMessage('Name is required'),
-    body('availabilityJson').isObject().withMessage('Invalid availability format'),
-    body('voiceProvider').notEmpty().withMessage('Voice provider is required'),
-    body('languageCode').notEmpty().withMessage('Language code is required'),
-    body('introMessage').notEmpty().withMessage('Intro message is required'),
+    body('availability').isObject().withMessage('Invalid availability format'),
+    body('voice.provider').notEmpty().withMessage('Voice provider is required'),
+    body('voice.language').notEmpty().withMessage('Language code is required'),
+    body('initial_message').notEmpty().withMessage('Initial message is required'),
   ],
   async (req: AuthRequest, res: Response) => {
     try {
@@ -49,29 +47,26 @@ router.post(
 
       const {
         name,
-        availabilityJson,
-        voiceProvider,
-        languageCode,
-        introMessage,
-        webhookUrl,
-        transcriptionEnabled,
-        recordingEnabled,
+        availability,
+        voice,
+        initial_message,
+        webhook,
+        transcriber,
+        recording_enabled,
       } = req.body;
 
-      // Create assistant in Vapi.ai
+      // Create assistant in Vapi.ai with metadata.businessId
       const vapiResponse = await axios.post(
-        'https://api.vapi.ai/assistants',
+        'https://api.vapi.ai/assistant',
         {
           name,
-          availability: availabilityJson,
-          voice: {
-            provider: voiceProvider,
-            language: languageCode,
-          },
-          initial_message: introMessage,
-          webhook_url: webhookUrl,
-          transcription_enabled: transcriptionEnabled,
-          recording_enabled: recordingEnabled,
+          availability,
+          voice,
+          initial_message,
+          webhook,
+          transcriber,
+          recording_enabled,
+          metadata: { businessId: req.user!.id },
         },
         {
           headers: {
@@ -81,23 +76,7 @@ router.post(
         }
       );
 
-      // Create assistant in our database
-      const assistant = await prisma.assistant.create({
-        data: {
-          userId: req.user!.id,
-          vapiAssistantId: vapiResponse.data.id,
-          name,
-          availabilityJson,
-          voiceProvider,
-          languageCode,
-          introMessage,
-          webhookUrl,
-          transcriptionEnabled,
-          recordingEnabled,
-        },
-      });
-
-      res.status(201).json(assistant);
+      res.status(201).json(vapiResponse.data);
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Server error' });
@@ -111,13 +90,12 @@ router.patch(
   auth,
   [
     body('name').optional(),
-    body('availabilityJson').optional().isObject(),
-    body('voiceProvider').optional(),
-    body('languageCode').optional(),
-    body('introMessage').optional(),
-    body('webhookUrl').optional(),
-    body('transcriptionEnabled').optional().isBoolean(),
-    body('recordingEnabled').optional().isBoolean(),
+    body('availability').optional().isObject(),
+    body('voice').optional().isObject(),
+    body('initial_message').optional(),
+    body('webhook').optional(),
+    body('transcriber').optional(),
+    body('recording_enabled').optional().isBoolean(),
   ],
   async (req: AuthRequest, res: Response) => {
     try {
@@ -127,34 +105,28 @@ router.patch(
       }
 
       const { id } = req.params;
-      const updateData = req.body;
+      const {
+        name,
+        availability,
+        voice,
+        initial_message,
+        webhook,
+        transcriber,
+        recording_enabled,
+      } = req.body;
 
-      // Get the assistant from our database
-      const assistant = await prisma.assistant.findFirst({
-        where: {
-          id,
-          userId: req.user!.id,
-        },
-      });
-
-      if (!assistant) {
-        return res.status(404).json({ error: 'Assistant not found' });
-      }
-
-      // Update assistant in Vapi.ai
-      await axios.patch(
-        `https://api.vapi.ai/assistants/${assistant.vapiAssistantId}`,
+      // Update assistant in Vapi.ai, always set metadata.businessId
+      const vapiPatch = await axios.patch(
+        `https://api.vapi.ai/assistant/${id}`,
         {
-          name: updateData.name,
-          availability: updateData.availabilityJson,
-          voice: updateData.voiceProvider && {
-            provider: updateData.voiceProvider,
-            language: updateData.languageCode,
-          },
-          initial_message: updateData.introMessage,
-          webhook_url: updateData.webhookUrl,
-          transcription_enabled: updateData.transcriptionEnabled,
-          recording_enabled: updateData.recordingEnabled,
+          name,
+          availability,
+          voice,
+          initial_message,
+          webhook,
+          transcriber,
+          recording_enabled,
+          metadata: { businessId: req.user!.id },
         },
         {
           headers: {
@@ -164,13 +136,7 @@ router.patch(
         }
       );
 
-      // Update assistant in our database
-      const updatedAssistant = await prisma.assistant.update({
-        where: { id },
-        data: updateData,
-      });
-
-      res.json(updatedAssistant);
+      res.json(vapiPatch.data);
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Server error' });
@@ -183,18 +149,19 @@ router.get('/:id', auth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const assistant = await prisma.assistant.findFirst({
-      where: {
-        id,
-        userId: req.user!.id,
+    // Fetch directly from Vapi
+    const vapiResponse = await axios.get(`https://api.vapi.ai/assistant/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.VAPI_API_KEY}`,
+        'Content-Type': 'application/json',
       },
     });
 
-    if (!assistant) {
+    if (!vapiResponse.data) {
       return res.status(404).json({ error: 'Assistant not found' });
     }
 
-    res.json(assistant);
+    res.json(vapiResponse.data);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 interface RegisterFormProps {
   onRegister: (token: string) => void;
@@ -22,7 +22,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onRegister }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/register', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -121,7 +121,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onRegister }) => {
         </form>
         <div className="flex justify-between items-center mt-4">
           <span className="text-sm text-gray-500">Already have an account?</span>
-          <a href="/login" className="text-indigo-600 hover:text-indigo-800 font-medium text-sm">Login</a>
+          <Link to="/login" className="text-indigo-600 hover:text-indigo-800 font-medium text-sm">Login</Link>
         </div>
         <div className="mt-8 text-xs text-gray-400 text-center">&copy; {new Date().getFullYear()} Vapi Assistant Manager. All rights reserved.</div>
       </div>
